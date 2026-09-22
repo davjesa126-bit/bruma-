@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hundir la Flota</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --sea-deep: #0b1d2e;
+    --sea-mid: #122d45;
+    --sea-panel: #15334d;
+    --chart: #e8dfc8;
+    --chart-line: #c9bd9c;
+    --brass: #c08a3e;
+    --brass-bright: #e0a94f;
+    --water: #4c7a94;
+    --hit: #c1462f;
+    --sunk: #7a3226;
+    --ink: #16222c;
+    --text: #e8dfc8;
+    --text-dim: #9fb3c2;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  * { box-sizing: border-box; }
+  body {
+    height: 100%;
+    margin: 0;
+    background: radial-gradient(ellipse at top, var(--sea-mid), var(--sea-deep) 70%);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, .display {
+    font-family: 'Big Shoulders Display', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    margin: 0;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  header.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid rgba(200,189,156,0.15);
+    background: rgba(11,29,46,0.6);
+    backdrop-filter: blur(6px);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  header.topbar .brand {
+    font-size: 22px;
+    color: var(--brass-bright);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  header.topbar .brand small {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+  }
+  header.topbar .controls { display: flex; gap: 10px; align-items: center; }
+  button {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    border: 1px solid var(--brass);
+    background: transparent;
+    color: var(--text);
+    padding: 9px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  button:hover { background: rgba(192,138,62,0.15); }
+  button:active { transform: scale(0.97); }
+  button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
+  button.primary {
+    background: var(--brass);
+    border-color: var(--brass);
+    color: var(--ink);
+  }
+  button.primary:hover { background: var(--brass-bright); }
+  button.icon {
+    padding: 8px 10px;
+    font-size: 16px;
+    line-height: 1;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 48px;
+    width: 100%;
+  }
+  .screen { width: 100%; max-width: 920px; display: none; }
+  .screen.active { display: block; }
+  .lobby-hero {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .lobby-hero h1 { font-size: clamp(38px, 8vw, 64px); color: var(--chart); line-height: 0.95; }
+  .lobby-hero p { color: var(--text-dim); margin-top: 10px; font-size: 15px; }
+  .lobby-card {
+    background: var(--sea-panel);
+    border: 1px solid rgba(200,189,156,0.15);
+    border-radius: 4px;
+    padding: 26px;
+    margin: 0 auto 18px;
+    max-width: 460px;
+  }
+  .lobby-card label {
+    display: block;
+    font-size: 12px;
+    text-transform: none;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    letter-spacing: 0.03em;
+  }
+  .lobby-card input[type=text] {
+    width: 100%;
+    padding: 11px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    background: var(--sea-deep);
+    border: 1px solid rgba(200,189,156,0.25);
+    color: var(--chart);
+    border-radius: 3px;
+    margin-bottom: 18px;
+  }
+  .lobby-card input[type=text]:focus-visible { outline: 2px solid var(--brass-bright); }
+  .mode-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mode-buttons button { padding: 14px; font-size: 15px; }
+  .lobby-links {
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 6px;
+  }
+  .lobby-links a {
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .lobby-links a:hover { color: var(--brass-bright); }
+  .game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .status-line {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  .status-line strong { color: var(--brass-bright); }
+  .boards {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .board-block { flex: 1; min-width: 300px; max-width: 420px; }
+  .board-block h3 {
+    font-size: 20px;
+    color: var(--chart);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .board-block h3 .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--water);
+  }
+  .board-block.turn h3 .dot { background: var(--brass-bright); box-shadow: 0 0 6px var(--brass-bright); }
+  .grid-wrap { display: grid; grid-template-columns: 22px 1fr; grid-template-rows: 22px 1fr; gap: 3px; }
+  .corner {}
+  .col-labels, .row-labels { display: grid; gap: 3px; }
+  .col-labels { grid-template-columns: repeat(10, 1fr); }
+  .row-labels { grid-template-rows: repeat(10, 1fr); }
+  .col-labels span, .row-labels span {
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-dim);
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(10, 1fr);
+    gap: 3px;
+    aspect-ratio: 1;
+    background: var(--chart-line);
+    padding: 3px;
+    border-radius: 3px;
+  }
+  .cell {
+    background: var(--chart);
+    position: relative;
+    border-radius: 1px;
+    aspect-ratio: 1;
+  }
+  .board.enemy .cell { cursor: crosshair; }
+  .board.enemy .cell:hover:not(.hit):not(.miss) { background: #f3ecda; }
+  .board.enemy .cell:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: -2px; }
+  .cell.ship { background: #9fae9a; }
+  .cell.miss::after {
+    content: ""; position: absolute; inset: 0; margin: auto;
+    width: 28%; height: 28%; border-radius: 50%;
+    background: var(--water);
+  }
+  .cell.hit { background: var(--hit); }
+  .cell.hit::after {
+    content: "✕"; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #2b0c05; font-weight: 700; font-size: 14px;
+  }
+  .cell.sunk { background: var(--sunk); }
+  .cell.sunk::after {
+    content: "☠"; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #ffd8c9; font-size: 13px;
+  }
+  .board-block:not(.enemy-block) .cell.ship { background: #7f9078; }
+  .ship-tray {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .ship-chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 5px 9px;
+    border: 1px solid rgba(200,189,156,0.3);
+    border-radius: 3px;
+    color: var(--text-dim);
+  }
+  .ship-chip.dead { text-decoration: line-through; opacity: 0.4; border-color: var(--hit); }
+  .game-footer {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .history-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .stat-box {
+    background: var(--sea-panel);
+    border: 1px solid rgba(200,189,156,0.15);
+    border-radius: 4px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-box .num { font-family: 'Big Shoulders Display', sans-serif; font-size: 34px; color: var(--brass-bright); }
+  .stat-box .label { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--sea-panel);
+    border: 1px solid rgba(200,189,156,0.12);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+  .history-row .outcome { font-weight: 600; }
+  .history-row .outcome.win { color: #8fd19e; }
+  .history-row .outcome.loss { color: #e08f7c; }
+  .history-row .meta { color: var(--text-dim); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+  .empty-note { color: var(--text-dim); text-align: center; padding: 30px 0; font-size: 14px; }
+  .chat-fab {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--brass);
+    color: var(--ink);
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    z-index: 30;
+    border: none;
+  }
+  .chat-fab .badge {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--hit); color: #fff;
+    font-size: 10px; font-weight: 700;
+    width: 18px; height: 18px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chat-panel {
+    position: fixed;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: min(320px, calc(100vw - 40px));
+    max-height: 400px;
+    background: var(--sea-panel);
+    border: 1px solid rgba(200,189,156,0.2);
+    border-radius: 6px;
+    display: none;
+    flex-direction: column;
+    z-index: 30;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .chat-panel.open { display: flex; }
+  .chat-panel .chat-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(200,189,156,0.15);
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 260px;
+  }
+  .chat-msg { font-size: 13px; }
+  .chat-msg .who { font-weight: 600; color: var(--brass-bright); }
+  .chat-input-row { display: flex; border-top: 1px solid rgba(200,189,156,0.15); }
+  .chat-input-row input {
+    flex: 1; border: none; background: transparent; color: var(--text);
+    padding: 10px 12px; font-size: 13px; font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .chat-input-row input:focus-visible { outline: none; }
+  .chat-input-row button { border: none; border-radius: 0; background: transparent; color: var(--brass-bright); }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(6,14,22,0.82);
+    display: none; align-items: center; justify-content: center; z-index: 40;
+    padding: 20px;
+  }
+  .overlay.open { display: flex; }
+  .overlay-card {
+    background: var(--sea-panel);
+    border: 1px solid var(--brass);
+    border-radius: 6px;
+    padding: 36px 30px;
+    text-align: center;
+    max-width: 360px;
+  }
+  .overlay-card h2 { font-size: 38px; color: var(--brass-bright); margin-bottom: 8px; }
+  .overlay-card p { color: var(--text-dim); margin-bottom: 22px; font-size: 14px; }
+  footer.credit {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 14px;
+    opacity: 0.6;
+  }
+  @media (max-width: 640px) {
+    .boards { gap: 18px; }
+    .board-block { min-width: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">⚓ HUNDIR LA FLOTA <small>TABLERO TÁCTICO</small></div>
+  <div class="controls">
+    <span class="mono" id="nameTag" style="font-size:13px;color:var(--text-dim);"></span>
+    <button class="icon" id="soundToggle" title="Sonido" aria-label="Alternar sonido">🔊</button>
+  </div>
+</header>
+
+<main>
+
+  <section class="screen active" id="screen-lobby">
+    <div class="lobby-hero">
+      <h1>HUNDIR<br>LA FLOTA</h1>
+      <p>Elegí tu apodo de capitán y salí a hundir la flota enemiga.</p>
+    </div>
+    <div class="lobby-card">
+      <label for="nickInput">Apodo del capitán</label>
+      <input type="text" id="nickInput" maxlength="18" placeholder="Ej: Capitán Garfio">
+      <div class="mode-buttons">
+        <button class="primary" id="btnVsAI">Jugar vs Computadora</button>
+        <button id="btnVs2P">Modo 2 jugadores (mismo dispositivo)</button>
+      </div>
+      <button id="btnVsRoom" style="width:100%;margin-top:10px;" disabled>Cargando modo online…</button>
+    </div>
+    <div class="lobby-links">
+      <a id="linkHistory">Ver historial y estadísticas</a>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-room">
+    <div class="lobby-hero">
+      <h1 style="font-size:clamp(30px,6vw,48px);">SALA ONLINE</h1>
+      <p>Jugá en tiempo real con otra persona usando un código de sala.</p>
+    </div>
+    <div class="lobby-card" id="roomSetupCard">
+      <div class="mode-buttons">
+        <button class="primary" id="btnCreateRoom">Crear sala nueva</button>
+        <button id="btnShowJoin">Unirme con código</button>
+      </div>
+      <div id="joinRow" style="display:none;margin-top:16px;">
+        <label for="joinCodeInput">Código de sala</label>
+        <input type="text" id="joinCodeInput" maxlength="5" placeholder="Ej: X7K2" style="text-transform:uppercase;">
+        <button class="primary" id="btnJoinRoom" style="width:100%;">Unirme</button>
+      </div>
+    </div>
+    <div class="lobby-card" id="roomWaitingCard" style="display:none;text-align:center;">
+      <p style="color:var(--text-dim);margin-bottom:6px;font-size:13px;">Código de tu sala</p>
+      <div id="roomCodeDisplay" style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:48px;color:var(--brass-bright);letter-spacing:0.1em;">----</div>
+      <p style="color:var(--text-dim);font-size:13px;margin-top:10px;">Compartí este código y el link de esta partida con tu rival, y esperá a que se una…</p>
+    </div>
+    <div id="roomError" style="color:var(--hit);text-align:center;font-size:13px;margin-top:6px;"></div>
+    <div class="lobby-links">
+      <a id="linkBackFromRoom">← Volver al lobby</a>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-history">
+    <h2 style="font-size:30px;color:var(--chart);margin-bottom:18px;">Historial y estadísticas</h2>
+    <div class="history-stats">
+      <div class="stat-box"><div class="num" id="statWins">0</div><div class="label">Victorias</div></div>
+      <div class="stat-box"><div class="num" id="statLosses">0</div><div class="label">Derrotas</div></div>
+      <div class="stat-box"><div class="num" id="statTotal">0</div><div class="label">Partidas totales</div></div>
+    </div>
+    <div class="history-list" id="historyList"></div>
+    <div class="game-footer">
+      <button id="btnBackFromHistory">← Volver al lobby</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-game">
+    <div class="game-header">
+      <div class="status-line" id="statusLine">Colocando flota…</div>
+      <div style="display:flex; gap:8px;">
+        <button id="btnReroll">🎲 Reubicar mi flota</button>
+        <button id="btnQuit">Abandonar</button>
+      </div>
+    </div>
+
+    <div class="boards">
+      <div class="board-block" id="ownBlock">
+        <h3><span class="dot"></span><span id="ownLabel">Tu flota</span></h3>
+        <div class="grid-wrap">
+          <div class="corner"></div>
+          <div class="col-labels" id="ownColLabels"></div>
+          <div class="row-labels" id="ownRowLabels"></div>
+          <div class="board" id="ownBoard"></div>
+        </div>
+        <div class="ship-tray" id="ownTray"></div>
+      </div>
+
+      <div class="board-block enemy-block" id="enemyBlock">
+        <h3><span class="dot"></span><span id="enemyLabel">Flota enemiga</span></h3>
+        <div class="grid-wrap">
+          <div class="corner"></div>
+          <div class="col-labels" id="enemyColLabels"></div>
+          <div class="row-labels" id="enemyRowLabels"></div>
+          <div class="board enemy" id="enemyBoard"></div>
+        </div>
+        <div class="ship-tray" id="enemyTray"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="credit">Hundir la Flota — partida local, sin conexión</footer>
+
+<button class="chat-fab" id="chatFab" aria-label="Abrir chat">💬<span class="badge" id="chatBadge" style="display:none;">0</span></button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head"><span>Chat de partida</span><button class="icon" id="chatClose" style="padding:2px 6px;">✕</button></div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" maxlength="140" placeholder="Escribí un mensaje…">
+    <button id="chatSend">Enviar</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <h2 id="overlayTitle">¡VICTORIA!</h2>
+    <p id="overlaySub">Hundiste toda la flota enemiga.</p>
+    <button class="primary" id="btnPlayAgain">Jugar otra vez</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const SIZE = 10;
+  const SHIPS = [
+    { name: "Portaaviones", len: 5 },
+    { name: "Acorazado", len: 4 },
+    { name: "Crucero", len: 3 },
+    { name: "Submarino", len: 3 },
+    { name: "Destructor", len: 2 },
+  ];
+  const COLS = "ABCDEFGHIJ".split("");
+
+  let state = {
+    nickname: "",
+    mode: null,
+    turn: null,
+    playerBoards: [null, null],
+    playerNames: ["", ""],
+    soundOn: true,
+    aiState: null,
+    active: false,
+    unreadChat: 0,
+  };
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyABUY9ltyj_GZ6X5KSuheQJtDTiPi1Qx2M",
+    authDomain: "bruma-aa4e2.firebaseapp.com",
+    databaseURL: "https://bruma-aa4e2-default-rtdb.firebaseio.com",
+    projectId: "bruma-aa4e2",
+    storageBucket: "bruma-aa4e2.firebasestorage.app",
+    messagingSenderId: "769783433408",
+    appId: "1:769783433408:web:fbcfefaafcf8c131e28525",
+    measurementId: "G-NNQ4F5FL0Y",
+  };
+  let fbApp = null;
+  let fbAuth = null;
+  let fbDb = null;
+  let myId = null;
+  let myName = null;
+  let roomDocRef = null;
+  let roomUnsub = null;
+  let roomChatUnsub = null;
+  let roomState = null;
+  let currentRoomCode = null;
+  let gameScreenShown = false;
+
+  function ensureSignedIn() {
+    return new Promise((resolve, reject) => {
+      const unsub = fbAuth.onAuthStateChanged((user) => {
+        unsub();
+        if (user) { resolve(user); }
+        else { fbAuth.signInAnonymously().then(cred => resolve(cred.user)).catch(reject); }
+      });
+    });
+  }
+
+  function showRoomError(msg) {
+    const el = document.getElementById("roomError");
+    if (el) el.textContent = msg;
+  }
+
+  let audioCtx = null;
+  function ctx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+  function tone(freq, dur, type, gainVal, delay) {
+    if (!state.soundOn) return;
+    try {
+      const c = ctx();
+      const t0 = c.currentTime + (delay || 0);
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(gainVal || 0.15, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      osc.connect(gain).connect(c.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    } catch(e) {}
+  }
+  function noiseBurst(dur, gainVal, delay) {
+    if (!state.soundOn) return;
+    try {
+      const c = ctx();
+      const t0 = c.currentTime + (delay || 0);
+      const bufferSize = c.sampleRate * dur;
+      const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      }
+      const noise = c.createBufferSource();
+      noise.buffer = buffer;
+      const gain = c.createGain();
+      gain.gain.setValueAtTime(gainVal || 0.2, t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      noise.connect(gain).connect(c.destination);
+      noise.start(t0);
+    } catch(e) {}
+  }
+  const sounds = {
+    shot: () => tone(180, 0.15, "square", 0.12),
+    splash: () => noiseBurst(0.4, 0.12),
+    hit: () => { tone(120, 0.25, "sawtooth", 0.18); noiseBurst(0.2, 0.1, 0.03); },
+    sunk: () => { tone(90, 0.5, "sawtooth", 0.2); tone(60, 0.6, "sawtooth", 0.18, 0.15); },
+    victory: () => { [523,659,784,1046].forEach((f,i)=>tone(f, 0.35, "triangle", 0.15, i*0.14)); },
+    defeat: () => { [400,340,280,220].forEach((f,i)=>tone(f, 0.4, "sawtooth", 0.13, i*0.16)); },
+    place: () => tone(300, 0.08, "sine", 0.08),
+    click: () => tone(500, 0.05, "sine", 0.06),
+    message: () => { tone(700, 0.08, "sine", 0.1); tone(900, 0.08, "sine", 0.08, 0.06); },
+  };
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem("bf_history") || "[]"); }
+    catch(e) { return []; }
+  }
+  function saveHistoryEntry(entry) {
+    const h = loadHistory();
+    h.unshift(entry);
+    try { localStorage.setItem("bf_history", JSON.stringify(h.slice(0, 100))); } catch(e) {}
+  }
+  function loadNickname() {
+    try { return localStorage.getItem("bf_nickname") || ""; } catch(e) { return ""; }
+  }
+  function saveNickname(name) {
+    try { localStorage.setItem("bf_nickname", name); } catch(e) {}
+  }
+
+  function emptyBoard() {
+    const cells = [];
+    for (let r = 0; r < SIZE; r++) {
+      const row = [];
+      for (let c = 0; c < SIZE; c++) {
+        row.push({ ship: null, shot: false });
+      }
+      cells.push(row);
+    }
+    return { cells, ships: [] };
+  }
+
+  function canPlace(board, r, c, len, horiz) {
+    for (let i = 0; i < len; i++) {
+      const rr = horiz ? r : r + i;
+      const cc = horiz ? c + i : c;
+      if (rr < 0 || rr >= SIZE || cc < 0 || cc >= SIZE) return false;
+      if (board.cells[rr][cc].ship) return false;
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nr = rr+dr, nc = cc+dc;
+          if (nr>=0 && nr<SIZE && nc>=0 && nc<SIZE && board.cells[nr][nc].ship) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function placeFleet(board) {
+    board = emptyBoard();
+    SHIPS.forEach(shipDef => {
+      let placed = false;
+      let tries = 0;
+      while (!placed && tries < 500) {
+        tries++;
+        const horiz = Math.random() < 0.5;
+        const r = Math.floor(Math.random() * SIZE);
+        const c = Math.floor(Math.random() * SIZE);
+        if (canPlace(board, r, c, shipDef.len, horiz)) {
+          const realCoords = [];
+          for (let i = 0; i < shipDef.len; i++) {
+            const rr = horiz ? r : r + i;
+            const cc = horiz ? c + i : c;
+            realCoords.push([rr, cc]);
+            board.cells[rr][cc].ship = shipDef.name;
+          }
+          board.ships.push({ name: shipDef.name, len: shipDef.len, coords: realCoords, hits: 0, sunk: false });
+          placed = true;
+        }
+      }
+    });
+    return board;
+  }
+
+  function fireAt(board, r, c) {
+    const cell = board.cells[r][c];
+    if (cell.shot) return "already";
+    cell.shot = true;
+    if (!cell.ship) return "miss";
+    const ship = board.ships.find(s => s.name === cell.ship);
+    ship.hits++;
+    if (ship.hits >= ship.len) {
+      ship.sunk = true;
+      return "sunk";
+    }
+    return "hit";
+  }
+
+  function allSunk(board) {
+    return board.ships.every(s => s.sunk);
+  }
+
+  function makeAI() {
+    return {
+      mode: "hunt",
+      targetQueue: [],
+      lastHit: null,
+      triedParity: true,
+    };
+  }
+
+  function aiChooseShot(ai, board) {
+    while (ai.targetQueue.length) {
+      const [r, c] = ai.targetQueue.shift();
+      if (r>=0 && r<SIZE && c>=0 && c<SIZE && !board.cells[r][c].shot) {
+        return [r, c];
+      }
+    }
+    ai.mode = "hunt";
+    const candidates = [];
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (!board.cells[r][c].shot && (r + c) % 2 === 0) candidates.push([r,c]);
+      }
+    }
+    const pool = candidates.length ? candidates : allEmptyCells(board);
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function allEmptyCells(board) {
+    const out = [];
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (!board.cells[r][c].shot) out.push([r,c]);
+    return out;
+  }
+
+  function aiRegisterResult(ai, r, c, result) {
+    if (result === "hit") {
+      ai.mode = "target";
+      [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].forEach(([rr,cc]) => {
+        if (rr>=0 && rr<SIZE && cc>=0 && cc<SIZE) ai.targetQueue.push([rr,cc]);
+      });
+    } else if (result === "sunk") {
+      ai.targetQueue = [];
+      ai.mode = "hunt";
+    }
+  }
+
+  function buildLabels(colEl, rowEl) {
+    colEl.innerHTML = "";
+    rowEl.innerHTML = "";
+    COLS.forEach(l => { const s = document.createElement("span"); s.textContent = l; colEl.appendChild(s); });
+    for (let i=1;i<=SIZE;i++){ const s = document.createElement("span"); s.textContent = i; rowEl.appendChild(s); }
+  }
+  buildLabels(document.getElementById("ownColLabels"), document.getElementById("ownRowLabels"));
+  buildLabels(document.getElementById("enemyColLabels"), document.getElementById("enemyRowLabels"));
+
+  function renderBoard(boardEl, board, opts) {
+    boardEl.innerHTML = "";
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const cell = board.cells[r][c];
+        const div = document.createElement("div");
+        div.className = "cell";
+        if (opts.showShips && cell.ship) div.classList.add("ship");
+        if (cell.shot) {
+          if (cell.ship) {
+            const ship = board.ships.find(s => s.name === cell.ship);
+            div.classList.add(ship.sunk ? "sunk" : "hit");
+          } else {
+            div.classList.add("miss");
+          }
+        }
+        if (opts.clickable && !cell.shot) {
+          div.tabIndex = 0;
+          div.setAttribute("role", "button");
+          div.setAttribute("aria-label", `Disparar a ${COLS[c]}${r+1}`);
+          div.addEventListener("click", () => opts.onCellClick(r, c));
+          div.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); opts.onCellClick(r,c); } });
+        }
+        boardEl.appendChild(div);
+      }
+    }
+  }
+
+  function renderTray(trayEl, board) {
+    trayEl.innerHTML = "";
+    board.ships.forEach(s => {
+      const chip = document.createElement("span");
+      chip.className = "ship-chip" + (s.sunk ? " dead" : "");
+      chip.textContent = `${s.name} (${s.len})`;
+      trayEl.appendChild(chip);
+    });
+  }
+
+  const screens = {
+    lobby: document.getElementById("screen-lobby"),
+    room: document.getElementById("screen-room"),
+    history: document.getElementById("screen-history"),
+    game: document.getElementById("screen-game"),
+  };
+  function showScreen(name) {
+    Object.values(screens).forEach(s => s.classList.remove("active"));
+    screens[name].classList.add("active");
+  }
+
+  function startGame(mode) {
+    const nick = document.getElementById("nickInput").value.trim() || "Capitán";
+    state.nickname = nick;
+    saveNickname(nick);
+    document.getElementById("nameTag").textContent = nick;
+    state.mode = mode;
+    state.active = true;
+
+    state.playerBoards[0] = placeFleet();
+    state.playerBoards[1] = placeFleet();
+    state.playerNames[0] = nick;
+    state.playerNames[1] = mode === "ai" ? "IA" : "Jugador 2";
+    state.turn = 0;
+    state.aiState = makeAI();
+    state.p2ready = mode === "2p" ? false : true;
+
+    document.getElementById("ownLabel").textContent = mode === "2p" ? `${state.playerNames[0]} (tablero propio)` : "Tu flota";
+    document.getElementById("enemyLabel").textContent = mode === "2p" ? "Rival (oculto)" : "Flota enemiga";
+
+    sounds.click();
+    showScreen("game");
+    renderGame();
+  }
+
+  function currentAttackerBoardIdx() { return state.turn === 0 ? 1 : 0; }
+
+  function renderGame() {
+    const ownBoard = state.playerBoards[0];
+    const enemyBoard = state.playerBoards[1];
+
+    renderBoard(document.getElementById("ownBoard"), ownBoard, { showShips: true, clickable: false });
+    renderTray(document.getElementById("ownTray"), ownBoard);
+
+    const enemyClickable = state.turn === 0 && state.active;
+    renderBoard(document.getElementById("enemyBoard"), enemyBoard, {
+      showShips: false,
+      clickable: enemyClickable,
+      onCellClick: (r,c) => handlePlayerShot(r,c),
+    });
+    renderTray(document.getElementById("enemyTray"), enemyBoard);
+
+    document.getElementById("ownBlock").classList.toggle("turn", state.turn === 1);
+    document.getElementById("enemyBlock").classList.toggle("turn", state.turn === 0);
+
+    const statusEl = document.getElementById("statusLine");
+    if (state.turn === 0) {
+      statusEl.innerHTML = `Turno de <strong>${state.playerNames[0]}</strong> — elegí una celda en el tablero enemigo`;
+    } else {
+      statusEl.innerHTML = `Turno de <strong>${state.playerNames[1]}</strong>${state.mode==="ai" ? " (pensando…)" : ""}`;
+    }
+  }
+
+  function handlePlayerShot(r, c) {
+    if (!state.active || state.turn !== 0) return;
+    const enemyBoard = state.playerBoards[1];
+    sounds.shot();
+    const result = fireAt(enemyBoard, r, c);
+    if (result === "already") return;
+    applyResultSound(result);
+    renderGame();
+
+    if (allSunk(enemyBoard)) {
+      endGame(true);
+      return;
+    }
+    if (result === "miss") {
+      state.turn = 1;
+      renderGame();
+      setTimeout(runOpponentTurn, 650);
+    } else {
+      renderGame();
+    }
+  }
+
+  function applyResultSound(result) {
+    if (result === "miss") sounds.splash();
+    else if (result === "hit") sounds.hit();
+    else if (result === "sunk") sounds.sunk();
+  }
+
+  function runOpponentTurn() {
+    if (!state.active || state.turn !== 1) return;
+    if (state.mode === "ai") {
+      const ownBoard = state.playerBoards[0];
+      const [r, c] = aiChooseShot(state.aiState, ownBoard);
+      sounds.shot();
+      const result = fireAt(ownBoard, r, c);
+      aiRegisterResult(state.aiState, r, c, result);
+      applyResultSound(result);
+      renderGame();
+      if (allSunk(ownBoard)) { endGame(false); return; }
+      if (result === "miss") {
+        state.turn = 0;
+        renderGame();
+      } else {
+        setTimeout(runOpponentTurn, 750);
+      }
+    } else {
+      promptPassDevice();
+    }
+  }
+
+  function promptPassDevice() {
+    document.getElementById("statusLine").innerHTML =
+      `Pasá el dispositivo a <strong>${state.playerNames[1]}</strong> y tocá "Continuar"`;
+    const board = document.getElementById("enemyBoard");
+    board.innerHTML = "";
+    const cover = document.createElement("div");
+    cover.style.cssText = "grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;";
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = "Continuar turno de " + state.playerNames[1];
+    btn.onclick = () => {
+      const own = state.playerBoards[0];
+      renderBoard(document.getElementById("enemyBoard"), own, {
+        showShips: false,
+        clickable: true,
+        onCellClick: (r,c) => handlePlayer2Shot(r,c),
+      });
+      document.getElementById("statusLine").innerHTML = `Turno de <strong>${state.playerNames[1]}</strong> — elegí una celda`;
+    };
+    board.style.display = "grid";
+    board.appendChild(cover);
+    cover.appendChild(btn);
+  }
+
+  function handlePlayer2Shot(r, c) {
+    const ownBoard = state.playerBoards[0];
+    sounds.shot();
+    const result = fireAt(ownBoard, r, c);
+    if (result === "already") return;
+    applyResultSound(result);
+    if (allSunk(ownBoard)) { endGame(false); return; }
+    if (result === "miss") {
+      state.turn = 0;
+      renderGame();
+    } else {
+      promptPassDevice2Continue();
+    }
+  }
+  function promptPassDevice2Continue() {
+    const board = document.getElementById("enemyBoard");
+    const own = state.playerBoards[0];
+    renderBoard(board, own, { showShips:false, clickable:true, onCellClick:(r,c)=>handlePlayer2Shot(r,c) });
+  }
+
+  function endGame(playerWon) {
+    state.active = false;
+    if (playerWon) { sounds.victory(); } else { sounds.defeat(); }
+    const title = document.getElementById("overlayTitle");
+    const sub = document.getElementById("overlaySub");
+    if (playerWon) {
+      title.textContent = "¡VICTORIA!";
+      sub.textContent = state.mode === "ai" ? "Hundiste toda la flota enemiga." : `${state.playerNames[0]} hundió toda la flota rival.`;
+    } else {
+      title.textContent = "DERROTA";
+      sub.textContent = state.mode === "ai" ? "La IA hundió tu flota." : `${state.playerNames[1]} hundió tu flota.`;
+    }
+    document.getElementById("overlay").classList.add("open");
+
+    saveHistoryEntry({
+      date: new Date().toISOString(),
+      opponent: state.mode === "ai" ? "IA" : state.playerNames[1],
+      result: playerWon ? "win" : "loss",
+      player: state.nickname,
+    });
+  }
+
+  function renderHistory() {
+    const h = loadHistory();
+    const wins = h.filter(e => e.result === "win").length;
+    const losses = h.filter(e => e.result === "loss").length;
+    document.getElementById("statWins").textContent = wins;
+    document.getElementById("statLosses").textContent = losses;
+    document.getElementById("statTotal").textContent = h.length;
+
+    const list = document.getElementById("historyList");
+    list.innerHTML = "";
+    if (!h.length) {
+      list.innerHTML = `<div class="empty-note">Todavía no jugaste ninguna partida.</div>`;
+      return;
+    }
+    h.slice(0, 30).forEach(e => {
+      const row = document.createElement("div");
+      row.className = "history-row";
+      const d = new Date(e.date);
+      const dateStr = d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      row.innerHTML = `
+        <span class="outcome ${e.result === "win" ? "win" : "loss"}">${e.result === "win" ? "Victoria" : "Derrota"} vs ${e.opponent}</span>
+        <span class="meta">${dateStr}</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  const chatFab = document.getElementById("chatFab");
+  const chatPanel = document.getElementById("chatPanel");
+  const chatMessages = document.getElementById("chatMessages");
+  const chatBadge = document.getElementById("chatBadge");
+
+  function openChat() {
+    chatPanel.classList.add("open");
+    state.unreadChat = 0;
+    chatBadge.style.display = "none";
+    document.getElementById("chatInput").focus();
+  }
+  chatFab.addEventListener("click", () => {
+    chatPanel.classList.contains("open") ? chatPanel.classList.remove("open") : openChat();
+  });
+  document.getElementById("chatClose").addEventListener("click", () => chatPanel.classList.remove("open"));
+
+  function addChatMessage(who, text) {
+    const div = document.createElement("div");
+    div.className = "chat-msg";
+    div.innerHTML = `<span class="who">${who}:</span> ${escapeHtml(text)}`;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+  function sendChat() {
+    const input = document.getElementById("chatInput");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    sounds.message();
+
+    if (state.mode === "room" && fbDb && currentRoomCode) {
+      fbDb.collection("games").doc(currentRoomCode).collection("chat").add({
+        senderId: myId,
+        senderName: state.nickname || "Vos",
+        text,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+      return;
+    }
+
+    addChatMessage(state.nickname || "Vos", text);
+    if (state.mode === "ai" && state.active) {
+      setTimeout(() => {
+        const replies = ["Buen tiro...", "Vas a necesitar algo mejor que eso.", "Mi flota está bien escondida.", "¡Ja! Fallaste.", "No pienso revelar mi estrategia.", "Buena suerte, la vas a necesitar."];
+        addChatMessage("IA", replies[Math.floor(Math.random()*replies.length)]);
+        if (!chatPanel.classList.contains("open")) {
+          state.unreadChat++;
+          chatBadge.style.display = "flex";
+          chatBadge.textContent = state.unreadChat;
+          sounds.message();
+        } else {
+          sounds.message();
+        }
+      }, 700 + Math.random()*900);
+    }
+  }
+  document.getElementById("chatSend").addEventListener("click", sendChat);
+  document.getElementById("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+
+  async function initFirebase() {
+    const btn = document.getElementById("btnVsRoom");
+    if (typeof firebase === "undefined") {
+      btn.disabled = true;
+      btn.textContent = "Modo online no disponible (no cargó Firebase)";
+      return;
+    }
+    try {
+      fbApp = firebase.initializeApp(firebaseConfig);
+      fbAuth = firebase.auth();
+      fbDb = firebase.firestore();
+    } catch (e) {
+      btn.disabled = true;
+      btn.textContent = "Modo online no disponible";
+      return;
+    }
+    try {
+      const user = await ensureSignedIn();
+      myId = user.uid;
+      btn.disabled = false;
+      btn.textContent = "Jugar por sala (online)";
+    } catch (e) {
+      btn.disabled = true;
+      btn.textContent = "No se pudo iniciar sesión online";
+    }
+  }
+
+  function makeRoomCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+
+  function shipsForStorage(board) {
+    // Firestore no admite arrays anidados dentro de arrays: guardamos cada
+    // coordenada como {r,c} en vez de [r,c].
+    return board.ships.map(s => ({ name: s.name, len: s.len, coords: s.coords.map(([r, c]) => ({ r, c })) }));
+  }
+
+  function normPoint(pt) {
+    return Array.isArray(pt) ? [pt[0], pt[1]] : [pt.r, pt.c];
+  }
+
+  function buildBoardView(shipsArr, shotsArr) {
+    const board = emptyBoard();
+    (shipsArr || []).forEach(s => {
+      const coords = s.coords.map(normPoint);
+      board.ships.push({ name: s.name, len: s.len, coords, hits: 0, sunk: false });
+      coords.forEach(([r, c]) => { board.cells[r][c].ship = s.name; });
+    });
+    (shotsArr || []).forEach(pt => {
+      const [r, c] = normPoint(pt);
+      const cell = board.cells[r][c];
+      cell.shot = true;
+      if (cell.ship) {
+        const ship = board.ships.find(sh => sh.name === cell.ship);
+        ship.hits++;
+        if (ship.hits >= ship.len) ship.sunk = true;
+      }
+    });
+    return board;
+  }
+
+  function computeShotResult(shipsArr, shotsArrWithNew, r, c) {
+    const view = buildBoardView(shipsArr, shotsArrWithNew);
+    const cell = view.cells[r][c];
+    if (!cell.ship) return "miss";
+    const ship = view.ships.find(s => s.name === cell.ship);
+    return ship.sunk ? "sunk" : "hit";
+  }
+
+  function isMyTurnRoom() {
+    if (!roomState || !myId) return false;
+    const amP1 = roomState.player1Id === myId;
+    return (amP1 && roomState.turn === "player1") || (!amP1 && roomState.turn === "player2");
+  }
+
+  async function createRoom() {
+    if (!fbDb || !myId) { showRoomError("No se pudo conectar con el servidor. Probá de nuevo en unos segundos."); return; }
+    const nick = document.getElementById("nickInput").value.trim() || myName || "Capitán";
+    state.nickname = nick; saveNickname(nick); myName = nick;
+
+    const hostBoard = placeFleet();
+    let code = makeRoomCode();
+    let docRef = fbDb.collection("games").doc(code);
+    showRoomError("");
+    try {
+      for (let i = 0; i < 3; i++) {
+        const existing = await docRef.get();
+        if (!existing.exists) break;
+        code = makeRoomCode();
+        docRef = fbDb.collection("games").doc(code);
+      }
+      await docRef.set({
+        player1Id: myId,
+        player1Name: nick,
+        player2Id: null,
+        player2Name: null,
+        player1Board: { ships: shipsForStorage(hostBoard) },
+        player2Board: null,
+        player1Shots: [],
+        player2Shots: [],
+        turn: "player1",
+        status: "waiting",
+        winner: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      fbDb.collection("players").doc(myId).set(
+        { nickname: nick, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    } catch (e) {
+      showRoomError("No se pudo crear la sala: " + (e && e.message ? e.message : "error desconocido"));
+      return;
+    }
+
+    currentRoomCode = code;
+    roomDocRef = docRef;
+    document.getElementById("roomSetupCard").style.display = "none";
+    document.getElementById("roomWaitingCard").style.display = "block";
+    document.getElementById("roomCodeDisplay").textContent = code;
+    state.mode = "room";
+    gameScreenShown = false;
+    subscribeRoom(code);
+  }
+
+  async function joinRoom() {
+    if (!fbDb || !myId) { showRoomError("No se pudo conectar con el servidor. Probá de nuevo en unos segundos."); return; }
+    const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
+    showRoomError("");
+    if (!code) { showRoomError("Ingresá un código de sala."); return; }
+
+    const nick = document.getElementById("nickInput").value.trim() || myName || "Capitán";
+    state.nickname = nick; saveNickname(nick); myName = nick;
+
+    const docRef = fbDb.collection("games").doc(code);
+    let snap;
+    try {
+      snap = await docRef.get();
+    } catch (e) {
+      showRoomError("No se pudo buscar la sala: " + (e && e.message ? e.message : "error desconocido"));
+      return;
+    }
+    if (!snap.exists) { showRoomError("No existe una sala con ese código."); return; }
+    const data = snap.data();
+    if (data.player2Id && data.player2Id !== myId) { showRoomError("Esa sala ya tiene dos jugadores."); return; }
+    if (data.player1Id === myId) { showRoomError("No podés unirte a tu propia sala. Abrí el link desde otro dispositivo o cuenta."); return; }
+
+    const guestBoard = placeFleet();
+    try {
+      await docRef.update({
+        player2Id: myId,
+        player2Name: nick,
+        player2Board: { ships: shipsForStorage(guestBoard) },
+        status: "playing",
+      });
+      fbDb.collection("players").doc(myId).set(
+        { nickname: nick, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    } catch (e) {
+      showRoomError("No se pudo unir a la sala: " + (e && e.message ? e.message : "error desconocido"));
+      return;
+    }
+
+    currentRoomCode = code;
+    roomDocRef = docRef;
+    state.mode = "room";
+    gameScreenShown = false;
+    subscribeRoom(code);
+  }
+
+  function subscribeRoom(code) {
+    if (roomUnsub) roomUnsub();
+    roomUnsub = roomDocRef.onSnapshot(
+      (snap) => { if (snap.exists) handleRoomUpdate(snap.data()); },
+      () => { document.getElementById("statusLine").textContent = "Se perdió la conexión con la sala."; }
+    );
+    subscribeRoomChat(code);
+  }
+
+  function subscribeRoomChat(code) {
+    if (roomChatUnsub) roomChatUnsub();
+    chatMessages.innerHTML = "";
+    roomChatUnsub = fbDb.collection("games").doc(code).collection("chat")
+      .orderBy("createdAt", "asc")
+      .limit(50)
+      .onSnapshot((snap) => {
+        chatMessages.innerHTML = "";
+        snap.forEach((d) => {
+          const m = d.data();
+          addChatMessage(m.senderName || "Jugador", m.text || "");
+        });
+      });
+  }
+
+  function handleRoomUpdate(data) {
+    const prevStatus = roomState ? roomState.status : null;
+    roomState = data;
+
+    if (data.status === "playing" && !gameScreenShown) {
+      gameScreenShown = true;
+      state.active = true;
+      document.getElementById("ownLabel").textContent = "Tu flota";
+      showScreen("game");
+    }
+    if (screens.game.classList.contains("active")) {
+      renderRoomGame();
+    }
+    if (data.status === "finished" && prevStatus !== "finished") {
+      const amP1 = data.player1Id === myId;
+      const iWon = (amP1 && data.winner === "player1") || (!amP1 && data.winner === "player2");
+      const oppName = amP1 ? data.player2Name : data.player1Name;
+      endGameRoom(iWon, oppName);
+    }
+    if (data.status === "abandoned" && prevStatus !== "abandoned" && data.abandonedBy !== myId) {
+      state.active = false;
+      sounds.defeat();
+      document.getElementById("overlayTitle").textContent = "RIVAL DESCONECTADO";
+      document.getElementById("overlaySub").textContent = "Tu rival abandonó la partida.";
+      document.getElementById("overlay").classList.add("open");
+    }
+  }
+
+  function renderRoomGame() {
+    if (!roomState) return;
+    const amP1 = roomState.player1Id === myId;
+    const myShips = (amP1 ? roomState.player1Board : roomState.player2Board)?.ships || [];
+    const shotsAgainstMe = amP1 ? roomState.player2Shots : roomState.player1Shots;
+    const myBoard = buildBoardView(myShips, shotsAgainstMe || []);
+
+    const oppBoardData = amP1 ? roomState.player2Board : roomState.player1Board;
+    const myShotsAtOpp = amP1 ? roomState.player1Shots : roomState.player2Shots;
+    const enemyBoard = oppBoardData ? buildBoardView(oppBoardData.ships, myShotsAtOpp || []) : emptyBoard();
+
+    renderBoard(document.getElementById("ownBoard"), myBoard, { showShips: true, clickable: false });
+    renderTray(document.getElementById("ownTray"), myBoard);
+
+    const myTurn = isMyTurnRoom();
+    const clickable = myTurn && roomState.status === "playing" && !!oppBoardData;
+    renderBoard(document.getElementById("enemyBoard"), enemyBoard, {
+      showShips: false,
+      clickable,
+      onCellClick: (r, c) => fireAtRoom(r, c),
+    });
+    renderTray(document.getElementById("enemyTray"), enemyBoard);
+
+    document.getElementById("ownBlock").classList.toggle("turn", !myTurn);
+    document.getElementById("enemyBlock").classList.toggle("turn", myTurn);
+
+    const oppName = (amP1 ? roomState.player2Name : roomState.player1Name) || "Rival";
+    document.getElementById("enemyLabel").textContent = oppName;
+
+    const statusEl = document.getElementById("statusLine");
+    if (roomState.status === "waiting") {
+      statusEl.innerHTML = `Sala <strong>${currentRoomCode}</strong> — esperando rival…`;
+    } else if (roomState.status === "playing") {
+      statusEl.innerHTML = myTurn
+        ? `Tu turno — elegí una celda en el tablero de <strong>${oppName}</strong>`
+        : `Turno de <strong>${oppName}</strong>…`;
+    }
+    document.getElementById("btnReroll").style.display = "none";
+  }
+
+  async function fireAtRoom(r, c) {
+    if (!roomState || !isMyTurnRoom() || roomState.status !== "playing") return;
+    const amP1 = roomState.player1Id === myId;
+    const myShotsField = amP1 ? "player1Shots" : "player2Shots";
+    const oppShipsArr = (amP1 ? roomState.player2Board : roomState.player1Board).ships;
+    const existingShots = roomState[myShotsField] || [];
+    if (existingShots.some(pt => { const [rr, cc] = normPoint(pt); return rr === r && cc === c; })) return;
+
+    const newShots = [...existingShots, { r, c }];
+    sounds.shot();
+    const result = computeShotResult(oppShipsArr, newShots, r, c);
+    applyResultSound(result);
+
+    const view = buildBoardView(oppShipsArr, newShots);
+    const won = allSunk(view);
+    const newTurn = result === "miss" ? (amP1 ? "player2" : "player1") : roomState.turn;
+
+    const update = { [myShotsField]: newShots, turn: newTurn };
+    if (won) { update.status = "finished"; update.winner = amP1 ? "player1" : "player2"; }
+
+    roomState = { ...roomState, ...update };
+    renderRoomGame();
+
+    try {
+      await roomDocRef.update(update);
+    } catch (e) {}
+  }
+
+  function endGameRoom(won, oppName) {
+    state.active = false;
+    if (won) { sounds.victory(); } else { sounds.defeat(); }
+    document.getElementById("overlayTitle").textContent = won ? "¡VICTORIA!" : "DERROTA";
+    document.getElementById("overlaySub").textContent = won
+      ? `Hundiste la flota de ${oppName || "tu rival"}.`
+      : `${oppName || "Tu rival"} hundió tu flota.`;
+    document.getElementById("overlay").classList.add("open");
+
+    if (fbDb && myId) {
+      fbDb.collection("history").add({
+        uid: myId,
+        opponent: oppName || "Sala online",
+        result: won ? "win" : "loss",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    }
+    saveHistoryEntry({
+      date: new Date().toISOString(),
+      opponent: oppName || "Sala online",
+      result: won ? "win" : "loss",
+      player: state.nickname,
+    });
+  }
+
+  function cleanupRoom() {
+    if (roomUnsub) { roomUnsub(); roomUnsub = null; }
+    if (roomChatUnsub) { roomChatUnsub(); roomChatUnsub = null; }
+    roomDocRef = null;
+    roomState = null;
+    currentRoomCode = null;
+    gameScreenShown = false;
+    document.getElementById("roomSetupCard").style.display = "block";
+    document.getElementById("roomWaitingCard").style.display = "none";
+    document.getElementById("joinRow").style.display = "none";
+    document.getElementById("joinCodeInput").value = "";
+    showRoomError("");
+    document.getElementById("btnReroll").style.display = "";
+  }
+
+  document.getElementById("btnVsAI").addEventListener("click", () => startGame("ai"));
+  document.getElementById("btnVs2P").addEventListener("click", () => startGame("2p"));
+  document.getElementById("btnVsRoom").addEventListener("click", () => showScreen("room"));
+  document.getElementById("linkHistory").addEventListener("click", () => { renderHistory(); showScreen("history"); });
+  document.getElementById("btnBackFromHistory").addEventListener("click", () => showScreen("lobby"));
+
+  document.getElementById("btnCreateRoom").addEventListener("click", createRoom);
+  document.getElementById("btnShowJoin").addEventListener("click", () => {
+    document.getElementById("joinRow").style.display = "block";
+  });
+  document.getElementById("btnJoinRoom").addEventListener("click", joinRoom);
+  document.getElementById("linkBackFromRoom").addEventListener("click", () => {
+    cleanupRoom();
+    showScreen("lobby");
+  });
+
+  document.getElementById("btnQuit").addEventListener("click", () => {
+    state.active = false;
+    document.getElementById("overlay").classList.remove("open");
+    if (state.mode === "room") {
+      if (roomDocRef && roomState && roomState.status === "playing") {
+        roomDocRef.update({ status: "abandoned", abandonedBy: myId }).catch(() => {});
+      }
+      cleanupRoom();
+    }
+    showScreen("lobby");
+  });
+  document.getElementById("btnReroll").addEventListener("click", () => {
+    if (!state.active || state.mode === "room") return;
+    state.playerBoards[0] = placeFleet();
+    sounds.place();
+    renderGame();
+  });
+  document.getElementById("btnPlayAgain").addEventListener("click", () => {
+    document.getElementById("overlay").classList.remove("open");
+    if (state.mode === "room") {
+      cleanupRoom();
+      showScreen("room");
+    } else {
+      startGame(state.mode);
+    }
+  });
+  document.getElementById("soundToggle").addEventListener("click", (e) => {
+    state.soundOn = !state.soundOn;
+    e.target.textContent = state.soundOn ? "🔊" : "🔇";
+    if (state.soundOn) sounds.click();
+  });
+
+  const savedNick = loadNickname();
+  if (savedNick) {
+    document.getElementById("nickInput").value = savedNick;
+    document.getElementById("nameTag").textContent = savedNick;
+  }
+  initFirebase();
+})();
+</script>
+</body>
+</html>
